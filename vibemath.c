@@ -84,16 +84,15 @@ static inline __m256 fast_trig_noise_avx(__m256 nx, __m256 ny, __m256 nz, __m256
 // [Insert APPLY_SPRING_PHYSICS() macro from the OLD TRUTH]
 // Boilerplate Spring Physics Macro to keep the shape functions perfectly clean
 #define APPLY_SPRING_PHYSICS() \
-    __m256 v_px = _mm256_loadu_ps(&px[i]), v_py = _mm256_loadu_ps(&py[i]), v_pz = _mm256_loadu_ps(&pz[i]); \
-    __m256 v_vx = _mm256_loadu_ps(&vx[i]), v_vy = _mm256_loadu_ps(&vy[i]), v_vz = _mm256_loadu_ps(&vz[i]); \
-    v_vx = _mm256_mul_ps(_mm256_fmadd_ps(_mm256_sub_ps(v_tx, v_px), v_k, v_vx), v_damp); \
-    v_vy = _mm256_mul_ps(_mm256_fmadd_ps(_mm256_sub_ps(v_ty, v_py), v_k, v_vy), v_damp); \
-    v_vz = _mm256_mul_ps(_mm256_fmadd_ps(_mm256_sub_ps(v_tz, v_pz), v_k, v_vz), v_damp); \
-    _mm256_storeu_ps(&px[i], _mm256_fmadd_ps(v_vx, v_dt, v_px)); \
-    _mm256_storeu_ps(&py[i], _mm256_fmadd_ps(v_vy, v_dt, v_py)); \
-    _mm256_storeu_ps(&pz[i], _mm256_fmadd_ps(v_vz, v_dt, v_pz)); \
-    _mm256_storeu_ps(&vx[i], v_vx); _mm256_storeu_ps(&vy[i], v_vy); _mm256_storeu_ps(&vz[i], v_vz);
-// [Insert AVX2_BOUNDS_CHECK() macro from the NEW BASELINE]
+__m256 v_px = _mm256_load_ps(&px[i]), v_py = _mm256_load_ps(&py[i]), v_pz = _mm256_load_ps(&pz[i]); \
+__m256 v_vx = _mm256_load_ps(&vx[i]), v_vy = _mm256_load_ps(&vy[i]), v_vz = _mm256_load_ps(&vz[i]); \
+v_vx = _mm256_mul_ps(_mm256_fmadd_ps(_mm256_sub_ps(v_tx, v_px), v_k, v_vx), v_damp); \
+v_vy = _mm256_mul_ps(_mm256_fmadd_ps(_mm256_sub_ps(v_ty, v_py), v_k, v_vy), v_damp); \
+v_vz = _mm256_mul_ps(_mm256_fmadd_ps(_mm256_sub_ps(v_tz, v_pz), v_k, v_vz), v_damp); \
+_mm256_stream_ps(&px[i], _mm256_fmadd_ps(v_vx, v_dt, v_px)); \
+_mm256_stream_ps(&py[i], _mm256_fmadd_ps(v_vy, v_dt, v_py)); \
+_mm256_stream_ps(&pz[i], _mm256_fmadd_ps(v_vz, v_dt, v_pz)); \
+_mm256_stream_ps(&vx[i], v_vx); _mm256_stream_ps(&vy[i], v_vy); _mm256_stream_ps(&vz[i], v_vz);
 // Macro to eliminate boilerplate for identical axis bounds checking
 #define AVX2_BOUNDS_CHECK(POS, VEL, V_MIN, V_MAX) \
     do { \
@@ -131,36 +130,32 @@ static inline void vmath_swarm_update_velocities(int count,
 
     int i = 0;
     for (; i <= count - 8; i += 8) {
-        // 1. Load (Unaligned assuming standard heap allocations, switch to _mm256_load_ps if 32-byte aligned)
-        __m256 px = _mm256_loadu_ps(&px_in[i]);
-        __m256 py = _mm256_loadu_ps(&py_in[i]);
-        __m256 pz = _mm256_loadu_ps(&pz_in[i]);
-        __m256 vx = _mm256_loadu_ps(&vx_in[i]);
-        __m256 vy = _mm256_loadu_ps(&vy_in[i]);
-        __m256 vz = _mm256_loadu_ps(&vz_in[i]);
+     __m256 px = _mm256_load_ps(&px_in[i]);
+     __m256 py = _mm256_load_ps(&py_in[i]);
+     __m256 pz = _mm256_load_ps(&pz_in[i]);
+     __m256 vx = _mm256_load_ps(&vx_in[i]);
+     __m256 vy = _mm256_load_ps(&vy_in[i]);
+     __m256 vz = _mm256_load_ps(&vz_in[i]);
 
-        // 2. Physics & Integration
-        vy = _mm256_sub_ps(vy, v_grav_dt);
-        vx = _mm256_mul_ps(vx, v_damp);
-        vy = _mm256_mul_ps(vy, v_damp);
-        vz = _mm256_mul_ps(vz, v_damp);
+     vy = _mm256_sub_ps(vy, v_grav_dt);
+     vx = _mm256_mul_ps(vx, v_damp);
+     vy = _mm256_mul_ps(vy, v_damp);
+     vz = _mm256_mul_ps(vz, v_damp);
 
-        px = _mm256_fmadd_ps(vx, v_dt, px);
-        py = _mm256_fmadd_ps(vy, v_dt, py);
-        pz = _mm256_fmadd_ps(vz, v_dt, pz);
+     px = _mm256_fmadd_ps(vx, v_dt, px);
+     py = _mm256_fmadd_ps(vy, v_dt, py);
+     pz = _mm256_fmadd_ps(vz, v_dt, pz);
 
-        // 3. Hardware Clamping & Reflection
-        AVX2_BOUNDS_CHECK(px, vx, v_minX, v_maxX);
-        AVX2_BOUNDS_CHECK(py, vy, v_minY, v_maxY);
-        AVX2_BOUNDS_CHECK(pz, vz, v_minZ, v_maxZ);
+     AVX2_BOUNDS_CHECK(px, vx, v_minX, v_maxX);
+     AVX2_BOUNDS_CHECK(py, vy, v_minY, v_maxY);
+     AVX2_BOUNDS_CHECK(pz, vz, v_minZ, v_maxZ);
 
-        // 4. Store
-        _mm256_storeu_ps(&px_out[i], px);
-        _mm256_storeu_ps(&py_out[i], py);
-        _mm256_storeu_ps(&pz_out[i], pz);
-        _mm256_storeu_ps(&vx_out[i], vx);
-        _mm256_storeu_ps(&vy_out[i], vy);
-        _mm256_storeu_ps(&vz_out[i], vz);
+     _mm256_stream_ps(&px_out[i], px);
+     _mm256_stream_ps(&py_out[i], py);
+     _mm256_stream_ps(&pz_out[i], pz);
+     _mm256_stream_ps(&vx_out[i], vx);
+     _mm256_stream_ps(&vy_out[i], vy);
+     _mm256_stream_ps(&vz_out[i], vz);
     }
 
     // Scalar Tail for N % 8 remainder
@@ -187,37 +182,32 @@ static inline void vmath_swarm_apply_explosion(int count, float* px, float* py, 
     __m256 v_force = _mm256_set1_ps(force);
     __m256 v_inv_radius = _mm256_set1_ps(1.0f / radius);
 
-    int i = 0; // <--- EXTRACTED SO IT SURVIVES FOR THE SCALAR LOOP!
+    int i = 0;
     for (; i <= count - 8; i += 8) {
-        __m256 dx = _mm256_sub_ps(_mm256_loadu_ps(&px[i]), v_ex);
-        __m256 dy = _mm256_sub_ps(_mm256_loadu_ps(&py[i]), v_ey);
-        __m256 dz = _mm256_sub_ps(_mm256_loadu_ps(&pz[i]), v_ez);
+     __m256 dx = _mm256_sub_ps(_mm256_load_ps(&px[i]), v_ex);
+     __m256 dy = _mm256_sub_ps(_mm256_load_ps(&py[i]), v_ey);
+     __m256 dz = _mm256_sub_ps(_mm256_load_ps(&pz[i]), v_ez);
+     __m256 dist2 = _mm256_fmadd_ps(dz, dz, _mm256_fmadd_ps(dy, dy, _mm256_mul_ps(dx, dx)));
+     __m256 mask = _mm256_and_ps(_mm256_cmp_ps(dist2, v_r2, _CMP_LT_OQ), _mm256_cmp_ps(dist2, v_1, _CMP_GT_OQ));
 
-        __m256 dist2 = _mm256_fmadd_ps(dz, dz, _mm256_fmadd_ps(dy, dy, _mm256_mul_ps(dx, dx)));
+     if (!_mm256_testz_ps(mask, mask)) {
+      __m256 inv_dist = _mm256_rsqrt_ps(dist2);
+      __m256 dist = _mm256_mul_ps(dist2, inv_dist);
+      __m256 f = _mm256_mul_ps(v_force, _mm256_sub_ps(v_1, _mm256_mul_ps(dist, v_inv_radius)));
+      __m256 f_inv_dist = _mm256_mul_ps(f, inv_dist);
 
-        // Mask: 1.0f < dist2 < r2
-        __m256 mask = _mm256_and_ps(_mm256_cmp_ps(dist2, v_r2, _CMP_LT_OQ), _mm256_cmp_ps(dist2, v_1, _CMP_GT_OQ));
+      __m256 v_vx = _mm256_load_ps(&vx[i]);
+      __m256 v_vy = _mm256_load_ps(&vy[i]);
+      __m256 v_vz = _mm256_load_ps(&vz[i]);
 
-        if (!_mm256_testz_ps(mask, mask)) {
-            __m256 inv_dist = _mm256_rsqrt_ps(dist2); // Fast hardware inverse square root
-            __m256 dist = _mm256_mul_ps(dist2, inv_dist);
+      v_vx = _mm256_blendv_ps(v_vx, _mm256_fmadd_ps(dx, f_inv_dist, v_vx), mask);
+      v_vy = _mm256_blendv_ps(v_vy, _mm256_fmadd_ps(dy, f_inv_dist, v_vy), mask);
+      v_vz = _mm256_blendv_ps(v_vz, _mm256_fmadd_ps(dz, f_inv_dist, v_vz), mask);
 
-            // f = force * (1.0f - dist * inv_radius)
-            __m256 f = _mm256_mul_ps(v_force, _mm256_sub_ps(v_1, _mm256_mul_ps(dist, v_inv_radius)));
-            __m256 f_inv_dist = _mm256_mul_ps(f, inv_dist); // (f / dist)
-
-            __m256 v_vx = _mm256_loadu_ps(&vx[i]);
-            __m256 v_vy = _mm256_loadu_ps(&vy[i]);
-            __m256 v_vz = _mm256_loadu_ps(&vz[i]);
-
-            v_vx = _mm256_blendv_ps(v_vx, _mm256_fmadd_ps(dx, f_inv_dist, v_vx), mask);
-            v_vy = _mm256_blendv_ps(v_vy, _mm256_fmadd_ps(dy, f_inv_dist, v_vy), mask);
-            v_vz = _mm256_blendv_ps(v_vz, _mm256_fmadd_ps(dz, f_inv_dist, v_vz), mask);
-
-            _mm256_storeu_ps(&vx[i], v_vx);
-            _mm256_storeu_ps(&vy[i], v_vy);
-            _mm256_storeu_ps(&vz[i], v_vz);
-        }
+      _mm256_stream_ps(&vx[i], v_vx);
+      _mm256_stream_ps(&vy[i], v_vy);
+      _mm256_stream_ps(&vz[i], v_vz);
+     }
     }
     // ========================================================
     // SCALAR TAIL LOOP (For Safety - Mod 8 remainders)
@@ -517,61 +507,41 @@ static inline void vmath_swarm_metal(int count, float* px, float* py, float* pz,
     __m256 v_damp = _mm256_set1_ps(0.92f);  // Friction
 
     int i = 0;
-    // BLAST 8 PARTICLES PER CYCLE
     for (; i <= count - 8; i += 8) {
-        __m256 v_s = _mm256_loadu_ps(&seed[i]);
+     __m256 v_s = _mm256_load_ps(&seed[i]);
+     __m256 v_sz = _mm256_fnmadd_ps(v_s, _mm256_set1_ps(2.0f), _mm256_set1_ps(1.0f));
+     __m256 v_rxy = _mm256_sqrt_ps(_mm256_fnmadd_ps(v_sz, v_sz, _mm256_set1_ps(1.0f)));
+     __m256 v_phi = _mm256_mul_ps(v_s, _mm256_set1_ps(10000.0f));
+     __m256 v_sx = _mm256_mul_ps(v_rxy, fast_cos_avx(v_phi));
+     __m256 v_sy = _mm256_mul_ps(v_rxy, fast_sin_avx(v_phi));
+     __m256 v_noise = fast_trig_noise_avx(v_sx, v_sy, v_sz, v_time);
+     __m256 v_disp = _mm256_mul_ps(v_noise, _mm256_mul_ps(v_blend, v_max_disp));
+     __m256 v_final_r = _mm256_add_ps(v_radius, v_disp);
+     __m256 v_tx = _mm256_fmadd_ps(v_sx, v_final_r, v_cx);
+     __m256 v_ty = _mm256_fmadd_ps(v_sy, v_final_r, v_cy);
+     __m256 v_tz = _mm256_fmadd_ps(v_sz, v_final_r, v_cz);
 
-        // 1. FAST SPHERICAL MAPPING (Fibonacci-style distribution without acos)
-        // Z goes from 1.0 to -1.0 based on seed
-        __m256 v_sz = _mm256_fnmadd_ps(v_s, _mm256_set1_ps(2.0f), _mm256_set1_ps(1.0f));
-        // Radius at this Z: r_xy = sqrt(1.0 - z*z)
-        __m256 v_rxy = _mm256_sqrt_ps(_mm256_fnmadd_ps(v_sz, v_sz, _mm256_set1_ps(1.0f)));
-        // Phi rotates wildly based on seed
-        __m256 v_phi = _mm256_mul_ps(v_s, _mm256_set1_ps(10000.0f));
+     __m256 v_px = _mm256_load_ps(&px[i]);
+     __m256 v_py = _mm256_load_ps(&py[i]);
+     __m256 v_pz = _mm256_load_ps(&pz[i]);
+     __m256 v_vx = _mm256_load_ps(&vx[i]);
+     __m256 v_vy = _mm256_load_ps(&vy[i]);
+     __m256 v_vz = _mm256_load_ps(&vz[i]);
 
-        __m256 v_sx = _mm256_mul_ps(v_rxy, fast_cos_avx(v_phi));
-        __m256 v_sy = _mm256_mul_ps(v_rxy, fast_sin_avx(v_phi));
+     v_vx = _mm256_mul_ps(_mm256_fmadd_ps(_mm256_sub_ps(v_tx, v_px), v_k, v_vx), v_damp);
+     v_vy = _mm256_mul_ps(_mm256_fmadd_ps(_mm256_sub_ps(v_ty, v_py), v_k, v_vy), v_damp);
+     v_vz = _mm256_mul_ps(_mm256_fmadd_ps(_mm256_sub_ps(v_tz, v_pz), v_k, v_vz), v_damp);
+     v_px = _mm256_fmadd_ps(v_vx, v_dt, v_px);
+     v_py = _mm256_fmadd_ps(v_vy, v_dt, v_py);
+     v_pz = _mm256_fmadd_ps(v_vz, v_dt, v_pz);
 
-        // 2. EVALUATE 4D NOISE AT THE NORMALS
-        __m256 v_noise = fast_trig_noise_avx(v_sx, v_sy, v_sz, v_time);
-
-        // 3. APPLY DISPLACEMENT (Using FMA to blend seamlessly!)
-        // displacement = noise * noise_blend * max_disp
-        __m256 v_disp = _mm256_mul_ps(v_noise, _mm256_mul_ps(v_blend, v_max_disp));
-
-        // Target Pos = Center + Normal * (Radius + Displacement)
-        __m256 v_final_r = _mm256_add_ps(v_radius, v_disp);
-        __m256 v_tx = _mm256_fmadd_ps(v_sx, v_final_r, v_cx);
-        __m256 v_ty = _mm256_fmadd_ps(v_sy, v_final_r, v_cy);
-        __m256 v_tz = _mm256_fmadd_ps(v_sz, v_final_r, v_cz);
-
-        // 4. SPRING PHYSICS (Pull current pos toward Target Pos)
-        __m256 v_px = _mm256_loadu_ps(&px[i]);
-        __m256 v_py = _mm256_loadu_ps(&py[i]);
-        __m256 v_pz = _mm256_loadu_ps(&pz[i]);
-
-        __m256 v_vx = _mm256_loadu_ps(&vx[i]);
-        __m256 v_vy = _mm256_loadu_ps(&vy[i]);
-        __m256 v_vz = _mm256_loadu_ps(&vz[i]);
-
-        // v += (target - p) * k * dt; v *= damp;
-        v_vx = _mm256_mul_ps(_mm256_fmadd_ps(_mm256_sub_ps(v_tx, v_px), v_k, v_vx), v_damp);
-        v_vy = _mm256_mul_ps(_mm256_fmadd_ps(_mm256_sub_ps(v_ty, v_py), v_k, v_vy), v_damp);
-        v_vz = _mm256_mul_ps(_mm256_fmadd_ps(_mm256_sub_ps(v_tz, v_pz), v_k, v_vz), v_damp);
-
-        // p += v * dt;
-        v_px = _mm256_fmadd_ps(v_vx, v_dt, v_px);
-        v_py = _mm256_fmadd_ps(v_vy, v_dt, v_py);
-        v_pz = _mm256_fmadd_ps(v_vz, v_dt, v_pz);
-
-        _mm256_storeu_ps(&px[i], v_px);
-        _mm256_storeu_ps(&py[i], v_py);
-        _mm256_storeu_ps(&pz[i], v_pz);
-        _mm256_storeu_ps(&vx[i], v_vx);
-        _mm256_storeu_ps(&vy[i], v_vy);
-        _mm256_storeu_ps(&vz[i], v_vz);
+     _mm256_stream_ps(&px[i], v_px);
+     _mm256_stream_ps(&py[i], v_py);
+     _mm256_stream_ps(&pz[i], v_pz);
+     _mm256_stream_ps(&vx[i], v_vx);
+     _mm256_stream_ps(&vy[i], v_vy);
+     _mm256_stream_ps(&vz[i], v_vz);
     }
-
     // ========================================================
     // SCALAR TAIL LOOP (For Safety - Mod 8 remainders)
     // ========================================================
@@ -651,62 +621,42 @@ static inline void vmath_swarm_smales(int count, float* px, float* py, float* pz
 
     int i = 0;
     for (; i <= count - 8; i += 8) {
-        __m256 v_s = _mm256_loadu_ps(&seed[i]);
+     __m256 v_s = _mm256_load_ps(&seed[i]);
+     __m256 v_theta = _mm256_mul_ps(v_s, v_pi);
+     __m256 v_phi = _mm256_mul_ps(v_s, v_phi_mul);
+     __m256 v_ny = fast_cos_avx(v_theta);
+     __m256 v_sin_theta = fast_sin_avx(v_theta);
+     __m256 v_nx = _mm256_mul_ps(v_sin_theta, fast_cos_avx(v_phi));
+     __m256 v_nz = _mm256_mul_ps(v_sin_theta, fast_sin_avx(v_phi));
+     __m256 v_waves = fast_cos_avx(_mm256_mul_ps(v_phi, v_4_0));
+     __m256 v_twist = fast_sin_avx(_mm256_mul_ps(v_theta, v_2_0));
+     __m256 v_r_corr = _mm256_mul_ps(v_base_radius, _mm256_mul_ps(v_bulge, _mm256_mul_ps(v_waves, _mm256_mul_ps(v_twist, v_1_2))));
+     __m256 v_r_main = _mm256_mul_ps(v_base_radius, v_eversion);
+     __m256 v_tx = _mm256_fmadd_ps(v_nx, _mm256_add_ps(v_r_main, v_r_corr), v_cx);
+     __m256 v_tz = _mm256_fmadd_ps(v_nz, _mm256_add_ps(v_r_main, v_r_corr), v_cz);
+     __m256 v_ty_offset = _mm256_mul_ps(fast_cos_avx(_mm256_mul_ps(v_theta, v_3_0)), _mm256_mul_ps(v_base_radius, _mm256_mul_ps(v_bulge, v_0_5)));
+     __m256 v_ty = _mm256_add_ps(v_cy, _mm256_fmadd_ps(v_ny, v_r_main, v_ty_offset));
 
-        // 1. Map seed to Theta [0, PI] and Phi [0, 2PI * 100]
-        __m256 v_theta = _mm256_mul_ps(v_s, v_pi);
-        __m256 v_phi = _mm256_mul_ps(v_s, v_phi_mul);
+     __m256 v_px = _mm256_load_ps(&px[i]);
+     __m256 v_py = _mm256_load_ps(&py[i]);
+     __m256 v_pz = _mm256_load_ps(&pz[i]);
+     __m256 v_vx = _mm256_load_ps(&vx[i]);
+     __m256 v_vy = _mm256_load_ps(&vy[i]);
+     __m256 v_vz = _mm256_load_ps(&vz[i]);
 
-        __m256 v_ny = fast_cos_avx(v_theta);
-        __m256 v_sin_theta = fast_sin_avx(v_theta);
+     v_vx = _mm256_mul_ps(_mm256_fmadd_ps(_mm256_sub_ps(v_tx, v_px), v_k, v_vx), v_damp);
+     v_vy = _mm256_mul_ps(_mm256_fmadd_ps(_mm256_sub_ps(v_ty, v_py), v_k, v_vy), v_damp);
+     v_vz = _mm256_mul_ps(_mm256_fmadd_ps(_mm256_sub_ps(v_tz, v_pz), v_k, v_vz), v_damp);
+     v_px = _mm256_fmadd_ps(v_vx, v_dt, v_px);
+     v_py = _mm256_fmadd_ps(v_vy, v_dt, v_py);
+     v_pz = _mm256_fmadd_ps(v_vz, v_dt, v_pz);
 
-        __m256 v_nx = _mm256_mul_ps(v_sin_theta, fast_cos_avx(v_phi));
-        __m256 v_nz = _mm256_mul_ps(v_sin_theta, fast_sin_avx(v_phi));
-
-        // 2. PARADOX MATH
-        __m256 v_waves = fast_cos_avx(_mm256_mul_ps(v_phi, v_4_0));
-        __m256 v_twist = fast_sin_avx(_mm256_mul_ps(v_theta, v_2_0));
-
-        __m256 v_r_corr = _mm256_mul_ps(v_base_radius,
-                          _mm256_mul_ps(v_bulge,
-                          _mm256_mul_ps(v_waves,
-                          _mm256_mul_ps(v_twist, v_1_2))));
-
-        __m256 v_r_main = _mm256_mul_ps(v_base_radius, v_eversion);
-
-        // 3. APPLY DISPLACEMENT
-        __m256 v_tx = _mm256_fmadd_ps(v_nx, _mm256_add_ps(v_r_main, v_r_corr), v_cx);
-        __m256 v_tz = _mm256_fmadd_ps(v_nz, _mm256_add_ps(v_r_main, v_r_corr), v_cz);
-
-        __m256 v_ty_offset = _mm256_mul_ps(fast_cos_avx(_mm256_mul_ps(v_theta, v_3_0)),
-                             _mm256_mul_ps(v_base_radius,
-                             _mm256_mul_ps(v_bulge, v_0_5)));
-
-        __m256 v_ty = _mm256_add_ps(v_cy, _mm256_fmadd_ps(v_ny, v_r_main, v_ty_offset));
-
-        // 4. SPRING PHYSICS
-        __m256 v_px = _mm256_loadu_ps(&px[i]);
-        __m256 v_py = _mm256_loadu_ps(&py[i]);
-        __m256 v_pz = _mm256_loadu_ps(&pz[i]);
-
-        __m256 v_vx = _mm256_loadu_ps(&vx[i]);
-        __m256 v_vy = _mm256_loadu_ps(&vy[i]);
-        __m256 v_vz = _mm256_loadu_ps(&vz[i]);
-
-        v_vx = _mm256_mul_ps(_mm256_fmadd_ps(_mm256_sub_ps(v_tx, v_px), v_k, v_vx), v_damp);
-        v_vy = _mm256_mul_ps(_mm256_fmadd_ps(_mm256_sub_ps(v_ty, v_py), v_k, v_vy), v_damp);
-        v_vz = _mm256_mul_ps(_mm256_fmadd_ps(_mm256_sub_ps(v_tz, v_pz), v_k, v_vz), v_damp);
-
-        v_px = _mm256_fmadd_ps(v_vx, v_dt, v_px);
-        v_py = _mm256_fmadd_ps(v_vy, v_dt, v_py);
-        v_pz = _mm256_fmadd_ps(v_vz, v_dt, v_pz);
-
-        _mm256_storeu_ps(&px[i], v_px);
-        _mm256_storeu_ps(&py[i], v_py);
-        _mm256_storeu_ps(&pz[i], v_pz);
-        _mm256_storeu_ps(&vx[i], v_vx);
-        _mm256_storeu_ps(&vy[i], v_vy);
-        _mm256_storeu_ps(&vz[i], v_vz);
+     _mm256_stream_ps(&px[i], v_px);
+     _mm256_stream_ps(&py[i], v_py);
+     _mm256_stream_ps(&pz[i], v_pz);
+     _mm256_stream_ps(&vx[i], v_vx);
+     _mm256_stream_ps(&vy[i], v_vy);
+     _mm256_stream_ps(&vz[i], v_vz);
     }
     // ========================================================
     // SCALAR TAIL LOOP (For Safety - Mod 8 remainders)
@@ -870,7 +820,7 @@ THREAD_FUNC worker_loop(void* arg) {
                     break;
             }
         }
-
+        _mm_sfence();
         // --- 3. REPORT COMPLETION ---
         vmath_mutex_lock(&g_job_mutex);
         g_jobs_completed++;
