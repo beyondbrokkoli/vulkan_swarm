@@ -84,6 +84,23 @@ ffi.cdef[[
     void vibe_start_render_thread();
     void vibe_kill_render_thread();
 ]]
+-- Add the C-API for our new AVX2 Fork-Join backend
+ffi.cdef[[
+    void vmath_init_workers(int num_threads);
+    void vmath_destroy_workers();
+    void vmath_dispatch_swarm(
+        int count,
+        float* px, float* py, float* pz,
+        float* vx, float* vy, float* vz,
+        float* seed,
+        int state, int push, int pull,
+        float cx, float cy, float cz,
+        float time, float dt, float gravity,
+        float blend_metal, float blend_paradox);
+]]
+
+-- Loaded dynamically. Handles purely CPU-side physics and ReBAR streaming.
+local vmath_lib = ffi.load(jit.os == "Windows" and "vibemath" or "./libvibemath.so")
 
 local active_coroutines = {}
 local co_blockers = {}
