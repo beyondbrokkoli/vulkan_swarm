@@ -294,6 +294,10 @@ static atomic_int g_render_thread_active = 0;
 
 EXPORT void vibe_ring_init_wsi(RenderThreadInit* wsi) {
     g_wsi = *wsi;
+
+    // Purge stale packets across WSI rebuilds
+    atomic_store_explicit(&g_ring.ready_idx, -1, memory_order_release);
+    atomic_store_explicit(&g_ring.read_idx, -1, memory_order_release);
 }
 
 EXPORT RenderPacket* vibe_ring_get_packet(int idx) {
