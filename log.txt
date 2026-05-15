@@ -1,4 +1,3 @@
-AzureAD+HalimOmarZaghdoudi@DESKTOP-BD3FFTI MINGW64 ~/vulkan_swarm
 $ ./boot.exe
 [C-CORE] Booting Headless Worker...
 [LUA-OS-THREAD] Booting Lua VM...
@@ -12,7 +11,7 @@ $ ./boot.exe
 [LUA] Window Surface Linked from Main Thread!
 [LUA] Hardware GPU Selected!
 [LUA] Logical Device Created!
-[DEBUG] Device Pointer in core:         cdata<struct VkDevice_T *>: 0x01a2c0df8068
+[DEBUG] Device Pointer in core:         cdata<struct VkDevice_T *>: 0x022a6115dde8
 [MEMORY] ReBAR Supported! Streaming directly to VRAM.
 [MEMORY] Allocated & Mapped VRAM Buffer: MASTER_GPU_BLOCK (256.00 MB)
 [MEMORY] ReBAR Supported! Streaming directly to VRAM.
@@ -42,10 +41,8 @@ $ ./boot.exe
 [RENDERER] Forging Synchronization Primitives...
 [LUA CO] Rebuild Complete. Resuming Weaver.
 [C-CORE] Async Render Thread Online.
+[LUA IO] ESCAPE PRESSED. Executing Teardown...
+[LUA-OS-THREAD] VM Destroyed.
 
-[VULKAN LAYER ENFORCER]
-SEVERITY: 4096
-MESSAGE: vkCmdPipelineBarrier(): pImageMemoryBarriers[1].image Invalid VkImage Object 0x140000000014.
-The Vulkan spec states: image must be a valid VkImage handle (https://docs.vulkan.org/spec/latest/chapters/synchronization.html#VUID-VkImageMemoryBarrier-image-parameter)
-
-Segmentation fault         ./boot.exe
+[C-CORE] Shutdown triggered. Waiting for Lua VM...
+[C-CORE] Clean Exit.
