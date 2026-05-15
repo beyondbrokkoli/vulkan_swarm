@@ -83,9 +83,7 @@ ffi.cdef[[
     void vibe_ring_init_wsi(RenderThreadInit* wsi);
     void vibe_start_render_thread();
     void vibe_kill_render_thread();
-]]
--- Add the C-API for our new AVX2 Fork-Join backend
-ffi.cdef[[
+
     void vmath_init_workers(int num_threads);
     void vmath_destroy_workers();
     void vmath_dispatch_swarm(
@@ -132,8 +130,7 @@ local function run_weaver()
         if #active_coroutines == 0 then break end
     end
 end
--- We now pass vk_state directly, and drop the standalone device/queue arguments
-local function render_fiber(vk, vk_state, sc_state, cmd_state, sync_state, frame_state, master_buf, comp_state, gfx_state, desc_state)
+local function render_fiber(vk, vk_state, sc_state, cmd_state, sync_state, frame_state, master_buf, comp_state, gfx_state, desc_state, soa)
     print("[LUA CO] Render Fiber Weaving...")
     local frame_count = 0
 
@@ -290,6 +287,19 @@ local function render_fiber(vk, vk_state, sc_state, cmd_state, sync_state, frame
 
             -- THE FIX: Smoothly accumulate real-world time for the shader
             pc.dt = pc.dt + dt
+
+            -- EXECUTE FORK-JOIN AVX2 BACKEND
+            vmath_lib.vmath_dispatch_swarm(
+                pc.particle_count,
+                soa.px, soa.py, soa.pz,
+                soa.vx, soa.vy, soa.vz,
+                soa.seed,
+                1, 0, 0,            -- State 1 (Bundle), No explosions
+                0.0, 5000.0, 0.0,   -- Center pos
+                pc.dt, dt,
+                9.81, 0.0, 0.0      -- Gravity & Blends
+            )
+
             vmath.multiply_mat4(proj, view, pc.viewProj)
 
             local success = renderer.ExecuteFrame(
@@ -338,6 +348,31 @@ local function command_glfw_fiber()
     local usage_flags = bit.bor(32, 128, 256) -- Added 128 (VERTEX_BUFFER_BIT)
     memory.CreateHostVisibleBuffer("MASTER_GPU_BLOCK", "uint8_t", UNIVERSE_SIZE, usage_flags, vk_state)
 
+    -- 1. Cast ReBAR memory to Float for CPU access
+    local master_ptr = ffi.cast("float*", memory.Mapped["MASTER_GPU_BLOCK"])
+    local p_count = 1000000
+
+    -- 2. Map SoA (Structure of Arrays) Pointers
+    local soa = {
+        px = master_ptr,
+        py = master_ptr + p_count,
+        pz = master_ptr + (p_count * 2),
+        vx = master_ptr + (p_count * 3),
+        vy = master_ptr + (p_count * 4),
+        vz = master_ptr + (p_count * 5),
+        seed = master_ptr + (p_count * 6)
+    }
+
+    -- 3. Initial Entropy Seeding
+    print("[LUA IO] Injecting Initial Entropy...")
+    for i = 0, p_count - 1 do
+        soa.seed[i] = math.random()
+        soa.py[i] = 5000.0 -- Start up high
+    end
+
+    -- 4. Boot Worker Pool (Matches your Arch CPU core count)
+    vmath_lib.vmath_init_workers(8)
+
     local pWidth = ffi.new("int[1]")
     local pHeight = ffi.new("int[1]")
     ffi.C.vibe_get_window_size(pWidth, pHeight)
@@ -383,7 +418,7 @@ local function command_glfw_fiber()
     -- ====================================================================
 
     start_fiber(function()
-        render_fiber(vk, vk_state, sc_state, cmd_state, sync_state, frame_state, memory.Buffers["MASTER_GPU_BLOCK"], comp_state, gfx_state, desc_state)
+        render_fiber(vk, vk_state, sc_state, cmd_state, sync_state, frame_state, memory.Buffers["MASTER_GPU_BLOCK"], comp_state, gfx_state, desc_state, soa)
     end)
 
     local window_active = true
