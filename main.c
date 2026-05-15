@@ -383,9 +383,9 @@ EXPORT void vibe_record_commands(VkCommandBuffer cmd, RenderPacket* p, PFN_vkCmd
     if (p->index_buffer != 0) {
         VkBuffer ibo = (VkBuffer)p->index_buffer;
         vkCmdBindIndexBuffer(cmd, ibo, 0, VK_INDEX_TYPE_UINT32);
-        vkCmdDrawIndexed(cmd, local_pc->particle_count * 12, 1, 0, 0, 0); 
+        vkCmdDrawIndexed(cmd, local_pc->particle_count * 12, 1, 0, 0, 0);
     } else {
-        vkCmdDraw(cmd, local_pc->particle_count, 1, 0, 0); 
+        vkCmdDraw(cmd, local_pc->particle_count, 1, 0, 0);
     }
 
     pfnEnd(cmd);

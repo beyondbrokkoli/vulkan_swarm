@@ -1,37 +1,45 @@
 #version 460
-
-layout(std430, binding = 0) readonly buffer MegaBuffer {
-    float data[];
-};
+#extension GL_EXT_scalar_block_layout : enable
 
 layout(push_constant) uniform PushConstants {
-    layout(offset = 0)  mat4 viewProj;
-    layout(offset = 64) uint pos_x_idx;
-    layout(offset = 68) uint pos_y_idx;
-    layout(offset = 72) uint pos_z_idx;
-    layout(offset = 76) uint particle_count;
-    layout(offset = 80) float dt;
+    mat4 viewProj;
+    uint pos_x_idx;
+    uint pos_y_idx;
+    uint pos_z_idx;
+    uint particle_count;
+    float dt;
+    uint _padding[11];
 } pc;
 
-layout(location = 0) out vec3 fragColor; // Changed to vec3
+layout(std430, set=0, binding=0) buffer ParticleBuffer {
+    float data[];
+} particles;
+
+// Tetrahedron corner offsets (pre-multiplied by size)
+const vec3 TETRA_CORNERS[4] = vec3[](
+    vec3( 1.0,  1.0,  1.0),
+    vec3(-1.0, -1.0,  1.0),
+    vec3(-1.0,  1.0, -1.0),
+    vec3( 1.0, -1.0, -1.0)
+);
+const float TETRA_SIZE = 15.0;
 
 void main() {
-    uint id = gl_VertexIndex;
-    if (id >= pc.particle_count) {
-        gl_Position = vec4(0.0, 0.0, 0.0, 0.0);
-        return;
-    }
-
-    float x = data[pc.pos_x_idx + id];
-    float y = data[pc.pos_y_idx + id];
-    float z = data[pc.pos_z_idx + id];
-
-    gl_Position = pc.viewProj * vec4(x, y, z, 1.0);
+    // 1. Map 12 indices → particle index + corner index
+    uint particle_idx = gl_VertexIndex / 12;
+    uint corner_idx   = (gl_VertexIndex % 12) / 3; // 0,1,2,3 repeated
     
-    // Closer particles get larger
-    gl_PointSize = clamp(1000.0 / gl_Position.w, 1.0, 4.0);
-
-    // Calculate depth intensity for the fragment shader (Cyberpunk gradient)
-    float depth = clamp((z + 10000.0) / 20000.0, 0.0, 1.0);
-    fragColor = mix(vec3(0.0, 0.8, 1.0), vec3(1.0, 0.0, 0.8), depth);
+    // 2. Fetch particle position from SOA layout
+    // Lua layout: px[0..N], py[0..N], pz[0..N], vx..., vy..., vz..., seed...
+    float px = particles.data[particle_idx];
+    float py = particles.data[particle_idx + pc.particle_count];
+    float pz = particles.data[particle_idx + (pc.particle_count * 2)];
+    vec3 world_pos = vec3(px, py, pz);
+    
+    // 3. Generate corner offset
+    vec3 corner_offset = TETRA_CORNERS[corner_idx] * TETRA_SIZE;
+    vec3 final_pos = world_pos + corner_offset;
+    
+    // 4. Transform & output
+    gl_Position = pc.viewProj * vec4(final_pos, 1.0);
 }
