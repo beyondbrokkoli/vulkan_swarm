@@ -11,7 +11,7 @@ $ ./boot.exe
 [LUA] Window Surface Linked from Main Thread!
 [LUA] Hardware GPU Selected!
 [LUA] Logical Device Created!
-[DEBUG] Device Pointer in core:         cdata<struct VkDevice_T *>: 0x022a6115dde8
+[DEBUG] Device Pointer in core:         cdata<struct VkDevice_T *>: 0x01c6ccd02c08
 [MEMORY] ReBAR Supported! Streaming directly to VRAM.
 [MEMORY] Allocated & Mapped VRAM Buffer: MASTER_GPU_BLOCK (256.00 MB)
 [MEMORY] ReBAR Supported! Streaming directly to VRAM.
@@ -25,7 +25,6 @@ $ ./boot.exe
 [COMPUTE] Swarm Pipeline Ready!
 [GRAPHICS] Building Reverse-Z Depth Buffer and Shader Modules...
 [GRAPHICS] Swarm Pipeline Successfully Compiled!
-[FACTORY] Forging Triple-Buffered Command Matrix...
 [RENDERER] Forging Synchronization Primitives...
 [LUA CO] Render Fiber Weaving...
 [C-CORE] Async Render Thread Online.
@@ -42,7 +41,7 @@ $ ./boot.exe
 [LUA CO] Rebuild Complete. Resuming Weaver.
 [C-CORE] Async Render Thread Online.
 [LUA IO] ESCAPE PRESSED. Executing Teardown...
-[LUA-OS-THREAD] VM Destroyed.
 
 [C-CORE] Shutdown triggered. Waiting for Lua VM...
+[LUA-OS-THREAD] VM Destroyed.
 [C-CORE] Clean Exit.

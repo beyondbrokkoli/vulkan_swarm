@@ -1,6 +1,5 @@
 local ffi = require("ffi")
 local bit = require("bit")
-local cmd_factory = require("command_factory")
 local math = require("math")
 
 -- ALIAS BRIDGE: Map KHR extension names to Core 1.3 definitions from parse.py
