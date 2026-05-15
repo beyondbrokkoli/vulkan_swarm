@@ -293,15 +293,15 @@ local function render_fiber(vk, vk_state, sc_state, cmd_state, sync_state, frame
                 soa.px, soa.py, soa.pz,
                 soa.vx, soa.vy, soa.vz,
                 soa.seed,
-                1, 0, 0, 
-                0.0, 5000.0, 0.0, 
-                pc.dt, dt, 
+                1, 0, 0,
+                0.0, 5000.0, 0.0,
+                pc.dt, dt,
                 9.81, 0.0, 0.0
             )
 
             local success = renderer.ExecuteFrame(
                 sc_state,
-                memory.Buffers["MASTER_GPU_BLOCK"],
+                master_buf,
                 memory.Buffers["MASTER_INDEX_BLOCK"], -- Passed here
                 comp_state,
                 gfx_state,
@@ -343,10 +343,10 @@ local function command_glfw_fiber()
     local device = vk_state.device
 
     local UNIVERSE_SIZE = 256 * 1024 * 1024
-    local usage_flags = bit.bor(32, 128, 256) 
+    local usage_flags = bit.bor(32, 128, 256)
     memory.CreateHostVisibleBuffer("MASTER_GPU_BLOCK", "uint8_t", UNIVERSE_SIZE, usage_flags, vk_state)
 
-    local INDEX_SIZE = 12000000 * 4 
+    local INDEX_SIZE = 12000000 * 4
     local idx_usage = bit.bor(64, 256)
     memory.CreateHostVisibleBuffer("MASTER_INDEX_BLOCK", "uint32_t", INDEX_SIZE / 4, idx_usage, vk_state)
 

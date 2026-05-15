@@ -11,7 +11,7 @@ layout(push_constant) uniform PushConstants {
     uint _padding[11];
 } pc;
 
-layout(std430, set=0, binding=0) buffer ParticleBuffer {
+layout(std430, set = 0, binding = 0, non_writable) buffer ParticleBuffer {
     float data[];
 } particles;
 
