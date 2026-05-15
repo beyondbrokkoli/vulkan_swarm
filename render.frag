@@ -1,0 +1,9 @@
+#version 460
+
+layout(location = 0) in vec4 fragColor;
+layout(location = 0) out vec4 outColor;
+
+void main() {
+    // Override everything. Render solid Neon Pink.
+    outColor = vec4(1.0, 0.0, 1.0, 1.0); 
+}
