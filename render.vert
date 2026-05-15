@@ -26,21 +26,20 @@ const vec3 TETRA_CORNERS[4] = vec3[](
 const float TETRA_SIZE = 15.0;
 
 void main() {
-    // 1. Map 12 indices → particle index + corner index
-    uint particle_idx = gl_VertexIndex / 12;
-    uint corner_idx   = (gl_VertexIndex % 12) / 3; // 0,1,2,3 repeated
-    
+    // 1. Map index buffer ID to particle & local corner
+    uint particle_idx = gl_VertexIndex / 4;
+    uint corner_idx   = gl_VertexIndex % 4;
+
     // 2. Fetch particle position from SOA layout
-    // Lua layout: px[0..N], py[0..N], pz[0..N], vx..., vy..., vz..., seed...
     float px = particles.data[particle_idx];
     float py = particles.data[particle_idx + pc.particle_count];
     float pz = particles.data[particle_idx + (pc.particle_count * 2)];
     vec3 world_pos = vec3(px, py, pz);
-    
+
     // 3. Generate corner offset
     vec3 corner_offset = TETRA_CORNERS[corner_idx] * TETRA_SIZE;
     vec3 final_pos = world_pos + corner_offset;
-    
+
     // 4. Transform & output
     gl_Position = pc.viewProj * vec4(final_pos, 1.0);
 }
