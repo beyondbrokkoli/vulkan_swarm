@@ -1,3 +1,4 @@
+AzureAD+HalimOmarZaghdoudi@DESKTOP-BD3FFTI MINGW64 ~/vulkan_swarm
 $ ./boot.exe
 [C-CORE] Booting Headless Worker...
 [LUA-OS-THREAD] Booting Lua VM...
@@ -11,9 +12,12 @@ $ ./boot.exe
 [LUA] Window Surface Linked from Main Thread!
 [LUA] Hardware GPU Selected!
 [LUA] Logical Device Created!
-[DEBUG] Device Pointer in core:         cdata<struct VkDevice_T *>: 0x021ad765cfe8
+[DEBUG] Device Pointer in core:         cdata<struct VkDevice_T *>: 0x022352cb6148
 [MEMORY] ReBAR Supported! Streaming directly to VRAM.
 [MEMORY] Allocated & Mapped VRAM Buffer: MASTER_GPU_BLOCK (256.00 MB)
+[MEMORY] ReBAR Supported! Streaming directly to VRAM.
+[MEMORY] Allocated & Mapped VRAM Buffer: MASTER_INDEX_BLOCK (45.78 MB)
+[LUA IO] Seeding Swarm Entropy & Geometry...
 [SWAPCHAIN] Building the display chain...
 [SWAPCHAIN] Created successfully with 3 images!
 [DESCRIPTORS] Wiring Master VRAM Arena as a Unified SSBO...
@@ -21,38 +25,65 @@ $ ./boot.exe
 [COMPUTE] Compiling Swarm Intelligence...
 [COMPUTE] Swarm Pipeline Ready!
 [GRAPHICS] Building Reverse-Z Depth Buffer and Shader Modules...
+
+[VULKAN LAYER ENFORCER]
+SEVERITY: 4096
+MESSAGE: vkCreateGraphicsPipelines(): pCreateInfos[0].pStages[0] SPIR-V (VK_SHADER_STAGE_VERTEX_BIT) uses descriptor [Set 0, Binding 0, variable "particles"] (type VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) which is not marked with NonWritable, but vertexPipelineStoresAndAtomics was not enabled.
+The Vulkan spec states: If the vertexPipelineStoresAndAtomics feature is not enabled, then all storage image, storage texel buffer, and storage buffer variables in the vertex, tessellation, and geometry stages must be decorated with the NonWritable decoration (https://docs.vulkan.org/spec/latest/appendices/spirvenv.html#VUID-RuntimeSpirv-NonWritable-06341)
+
 [GRAPHICS] Swarm Pipeline Successfully Compiled!
 [FACTORY] Forging Triple-Buffered Command Matrix...
 [RENDERER] Forging Synchronization Primitives...
 [LUA CO] Render Fiber Weaving...
 [C-CORE] Async Render Thread Online.
-[LUA CO] Window Stable. Initiating Vulkan Rebuild...
-[C-CORE] Async Render Thread gracefully terminated for rebuild.
-[TEARDOWN] Destroying Graphics Pipeline & Depth Buffer...
-[TEARDOWN] Destroying Swapchain & Image Views...
-[TEARDOWN] Dismantling Renderer Sync Objects...
-[SWAPCHAIN] Building the display chain...
-[SWAPCHAIN] Created successfully with 3 images!
-[GRAPHICS] Building Reverse-Z Depth Buffer and Shader Modules...
-[GRAPHICS] Swarm Pipeline Successfully Compiled!
-[RENDERER] Forging Synchronization Primitives...
-[LUA CO] Rebuild Complete. Resuming Weaver.
-[C-CORE] Async Render Thread Online.
-[LUA CO] Window Stable. Initiating Vulkan Rebuild...
-[C-CORE] Async Render Thread gracefully terminated for rebuild.
-[TEARDOWN] Destroying Graphics Pipeline & Depth Buffer...
-[TEARDOWN] Destroying Swapchain & Image Views...
-[TEARDOWN] Dismantling Renderer Sync Objects...
-[SWAPCHAIN] Building the display chain...
-[SWAPCHAIN] Created successfully with 3 images!
-[GRAPHICS] Building Reverse-Z Depth Buffer and Shader Modules...
-[GRAPHICS] Swarm Pipeline Successfully Compiled!
-[RENDERER] Forging Synchronization Primitives...
-[LUA CO] Rebuild Complete. Resuming Weaver.
-[C-CORE] Async Render Thread Online.
-[LUA IO] ESCAPE PRESSED. Executing Teardown...
 
-[C-CORE] Shutdown triggered. Waiting for Lua VM...
-[LUA-OS-THREAD] VM Destroyed.
-[C-CORE] Clean Exit.
+[VULKAN LAYER ENFORCER]
+SEVERITY: 4096
+MESSAGE: vkCmdPushConstants(): is called with
+  stageFlags (VK_SHADER_STAGE_VERTEX_BIT), offset (0), size (128)
+which is missing stageFlags from the overlapping VkPushConstantRange in VkPipelineLayout 0xf000000000f
+  stageFlags (VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_COMPUTE_BIT), offset (0), size (128).
+The Vulkan spec states: For each byte in the range specified by offset and size and for each push constant range that overlaps that byte, stageFlags must include all stages in that push constant range
+'s VkPushConstantRange::stageFlags (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html
+#VUID-vkCmdPushConstants-offset-01796)
+
+
+[VULKAN LAYER ENFORCER]
+SEVERITY: 4096
+MESSAGE: vkCmdPushConstants(): is called with
+  stageFlags (VK_SHADER_STAGE_VERTEX_BIT), offset (0), size (128)
+which is missing stageFlags from the overlapping VkPushConstantRange in VkPipelineLayout 0xf000000000f
+  stageFlags (VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_COMPUTE_BIT), offset (0), size (128).
+The Vulkan spec states: For each byte in the range specified by offset and size and for each push constant range that overlaps that byte, stageFlags must include all stages in that push constant range
+'s VkPushConstantRange::stageFlags (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html
+#VUID-vkCmdPushConstants-offset-01796)
+
+
+[VULKAN LAYER ENFORCER]
+SEVERITY: 4096
+MESSAGE: vkCmdPushConstants(): is called with
+  stageFlags (VK_SHADER_STAGE_VERTEX_BIT), offset (0), size (128)
+which is missing stageFlags from the overlapping VkPushConstantRange in VkPipelineLayout 0xf000000000f
+  stageFlags (VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_COMPUTE_BIT), offset (0), size (128).
+The Vulkan spec states: For each byte in the range specified by offset and size and for each push constant range that overlaps that byte, stageFlags must include all stages in that push constant range
+'s VkPushConstantRange::stageFlags (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html
+#VUID-vkCmdPushConstants-offset-01796)
+
+
+[VULKAN LAYER ENFORCER]
+SEVERITY: 4096
+MESSAGE: vkCmdPushConstants(): is called with
+  stageFlags (VK_SHADER_STAGE_VERTEX_BIT), offset (0), size (128)
+which is missing stageFlags from the overlapping VkPushConstantRange in VkPipelineLayout 0xf000000000f
+  stageFlags (VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_COMPUTE_BIT), offset (0), size (128).
+The Vulkan spec states: For each byte in the range specified by offset and size and for each push constant range that overlaps that byte, stageFlags must include all stages in that push constant range's VkPushConstantRange::stageFlags (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkCmdPushConstants-offset-01796)
+
+
+[VULKAN LAYER ENFORCER]
+SEVERITY: 4096
+MESSAGE: vkCmdPushConstants(): is called with
+  stageFlags (VK_SHADER_STAGE_VERTEX_BIT), offset (0), size (128)
+which is missing stageFlags from the overlapping VkPushConstantRange in VkPipelineLayout 0xf000000000f
+  stageFlags (VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_COMPUTE_BIT), offset (0), size (128).
+The Vulkan spec states: For each byte in the range specified by offset and size and for each push constant range that overlaps that byte, stageFlags must include all stages in that push constant range's VkPushConstantRange::stageFlags (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkCmdPushConstants-offset-01796)
 
