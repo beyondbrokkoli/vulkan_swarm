@@ -26,7 +26,11 @@
 typedef pthread_t vmath_thread_t;
 #define THREAD_FUNC void*
 #define THREAD_RETURN_VAL NULL
-
+#if defined(_WIN32) || defined(_WIN64)
+    #include <windows.h>
+    #include <timeapi.h>
+    #pragma comment(lib, "winmm.lib")
+#endif
 static vmath_thread_t vmath_thread_start(void* (*func)(void*), void* arg) {
     pthread_t thread;
     pthread_create(&thread, NULL, func, arg);
@@ -257,13 +261,13 @@ typedef struct {
 } RenderThreadInit;
 
 typedef struct __attribute__((packed, aligned(64))) {
-    // REMOVED: void* cmd
     uint64_t comp_pipeline;
     uint64_t comp_layout;
     uint64_t gfx_pipeline;
     uint64_t gfx_layout;
     uint64_t desc_set;
     uint64_t vertex_buffer;
+    uint64_t index_buffer;     // Added
     uint64_t swapchain_image;
     uint64_t swapchain_view;
     uint64_t depth_image;
@@ -271,7 +275,7 @@ typedef struct __attribute__((packed, aligned(64))) {
     uint32_t width;
     uint32_t height;
     uint8_t pc_payload[128];
-    uint8_t _padding[64]; // Padded to exactly 256 bytes for L1 Cache Isolation
+    uint8_t _padding[56];      // Adjusted to maintain 256-byte alignment
 } RenderPacket;
 
 // The Triad Topology
@@ -454,6 +458,7 @@ THREAD_FUNC render_thread_loop(void* arg) {
         // 2. Triad Consumer Handoff
         int ready = atomic_load_explicit(&g_ring.ready_idx, memory_order_acquire);
         if (ready == -1 || ready == local_read) {
+            SLEEP_MS(1);
             continue; // Spinlock: Lua hasn't finished a new frame yet
         }
         local_read = ready;
@@ -471,6 +476,7 @@ THREAD_FUNC render_thread_loop(void* arg) {
 
         if (res == VK_ERROR_OUT_OF_DATE_KHR) {
             atomic_store_explicit(&g_engine.mailbox.window_resized, 1, memory_order_release);
+            SLEEP_MSM(10);
             continue;
         }
         pfnReset(g_wsi.device, 1, &g_wsi.in_flight[current_frame]);
@@ -609,6 +615,7 @@ int main(int argc, char** argv) {
             atomic_store_explicit(&g_engine.mailbox.last_key_pressed, GLFW_KEY_ESCAPE, memory_order_release);
             glfwSetWindowShouldClose(window, GLFW_FALSE);
         }
+        SLEEP_MS(1);
     }
 
     printf("\n[C-CORE] Shutdown triggered. Waiting for Lua VM...\n");
