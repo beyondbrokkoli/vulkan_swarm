@@ -58,32 +58,6 @@ ffi.cdef[[
         void* pfnEnd;
     } RenderThreadInit;
 
-    typedef struct __attribute__((packed, aligned(64))) {
-        // REMOVED: void* cmd
-        uint64_t comp_pipeline;
-        uint64_t comp_layout;
-        uint64_t gfx_pipeline;
-        uint64_t gfx_layout;
-        uint64_t desc_set;
-        uint64_t vertex_buffer;
-        uint64_t swapchain_image;
-        uint64_t swapchain_view;
-        uint64_t depth_image;
-        uint64_t depth_view;
-        uint32_t width;
-        uint32_t height;
-        uint8_t pc_payload[128];
-        uint8_t _padding[64]; // Padded to exactly 256 bytes for L1 Cache Isolation
-    } RenderPacket;
-
-    void vibe_record_commands(RenderPacket* p, void* pfnBegin, void* pfnEnd);
-    int vibe_ring_get_write_idx();
-    RenderPacket* vibe_ring_get_packet(int idx);
-    void vibe_ring_submit(int idx);
-    void vibe_ring_init_wsi(RenderThreadInit* wsi);
-    void vibe_start_render_thread();
-    void vibe_kill_render_thread();
-
     void vmath_init_workers(int num_threads);
     void vmath_destroy_workers();
     void vmath_dispatch_swarm(
@@ -95,6 +69,32 @@ ffi.cdef[[
         float cx, float cy, float cz,
         float time, float dt, float gravity,
         float blend_metal, float blend_paradox);
+
+    typedef struct __attribute__((packed, aligned(64))) {
+        uint64_t comp_pipeline;
+        uint64_t comp_layout;
+        uint64_t gfx_pipeline;
+        uint64_t gfx_layout;
+        uint64_t desc_set;
+        uint64_t vertex_buffer;
+        uint64_t index_buffer;
+        uint64_t swapchain_image;
+        uint64_t swapchain_view;
+        uint64_t depth_image;
+        uint64_t depth_view;
+        uint32_t width;
+        uint32_t height;
+        uint8_t pc_payload[128];
+        uint8_t _padding[32];
+    } RenderPacket;
+
+    void vibe_record_commands(RenderPacket* p, void* pfnBegin, void* pfnEnd);
+    int vibe_ring_get_write_idx();
+    RenderPacket* vibe_ring_get_packet(int idx);
+    void vibe_ring_submit(int idx);
+    void vibe_ring_init_wsi(RenderThreadInit* wsi);
+    void vibe_start_render_thread();
+    void vibe_kill_render_thread();
 ]]
 
 -- Loaded dynamically. Handles purely CPU-side physics and ReBAR streaming.
@@ -253,10 +253,9 @@ local function render_fiber(vk, vk_state, sc_state, cmd_state, sync_state, frame
         else
             -- Calculate real-world delta time (dt)
             local current_time = os.clock()
-            local dt = current_time - last_time
+            local dt = math.max(0.001, math.min(current_time - last_time, 0.033))
             last_time = current_time
-            -- Prevent physics explosions on lag spikes
-            dt = math.min(dt, 0.033)
+
             -- Input Polling & Camera Math
             local dx = ffi.C.vibe_get_mouse_dx()
             local dy = ffi.C.vibe_get_mouse_dy()
@@ -286,26 +285,24 @@ local function render_fiber(vk, vk_state, sc_state, cmd_state, sync_state, frame
                          cam_pos.x + fwd_x, cam_pos.y + fwd_y, cam_pos.z + fwd_z,
                          view)
 
-            -- THE FIX: Smoothly accumulate real-world time for the shader
             pc.dt = pc.dt + dt
+            vmath.multiply_mat4(proj, view, pc.viewProj)
 
-            -- EXECUTE FORK-JOIN AVX2 BACKEND
             vmath_lib.vmath_dispatch_swarm(
                 pc.particle_count,
                 soa.px, soa.py, soa.pz,
                 soa.vx, soa.vy, soa.vz,
                 soa.seed,
-                1, 0, 0,            -- State 1 (Bundle), No explosions
-                0.0, 5000.0, 0.0,   -- Center pos
-                pc.dt, dt,
-                9.81, 0.0, 0.0      -- Gravity & Blends
+                1, 0, 0, 
+                0.0, 5000.0, 0.0, 
+                pc.dt, dt, 
+                9.81, 0.0, 0.0
             )
-
-            vmath.multiply_mat4(proj, view, pc.viewProj)
 
             local success = renderer.ExecuteFrame(
                 sc_state,
                 memory.Buffers["MASTER_GPU_BLOCK"],
+                memory.Buffers["MASTER_INDEX_BLOCK"], -- Passed here
                 comp_state,
                 gfx_state,
                 pc,
@@ -346,29 +343,43 @@ local function command_glfw_fiber()
     local device = vk_state.device
 
     local UNIVERSE_SIZE = 256 * 1024 * 1024
-    local usage_flags = bit.bor(32, 128, 256) -- Added 128 (VERTEX_BUFFER_BIT)
+    local usage_flags = bit.bor(32, 128, 256) 
     memory.CreateHostVisibleBuffer("MASTER_GPU_BLOCK", "uint8_t", UNIVERSE_SIZE, usage_flags, vk_state)
 
-    -- 1. Cast ReBAR memory to Float for CPU access
+    local INDEX_SIZE = 12000000 * 4 
+    local idx_usage = bit.bor(64, 256)
+    memory.CreateHostVisibleBuffer("MASTER_INDEX_BLOCK", "uint32_t", INDEX_SIZE / 4, idx_usage, vk_state)
+
     local master_ptr = ffi.cast("float*", memory.Mapped["MASTER_GPU_BLOCK"])
     local p_count = 1000000
 
-    -- 2. Map SoA (Structure of Arrays) Pointers
     local soa = {
-        px = master_ptr,
-        py = master_ptr + p_count,
-        pz = master_ptr + (p_count * 2),
-        vx = master_ptr + (p_count * 3),
-        vy = master_ptr + (p_count * 4),
-        vz = master_ptr + (p_count * 5),
+        px   = master_ptr,
+        py   = master_ptr + p_count,
+        pz   = master_ptr + (p_count * 2),
+        vx   = master_ptr + (p_count * 3),
+        vy   = master_ptr + (p_count * 4),
+        vz   = master_ptr + (p_count * 5),
         seed = master_ptr + (p_count * 6)
     }
 
-    -- 3. Initial Entropy Seeding
-    print("[LUA IO] Injecting Initial Entropy...")
-    for i = 0, p_count - 1 do
-        soa.seed[i] = math.random()
-        soa.py[i] = 5000.0 -- Start up high
+    local idx_ptr = memory.Mapped["MASTER_INDEX_BLOCK"]
+    local i_offset = 0
+
+    print("[LUA IO] Seeding Swarm Entropy & Geometry...")
+    for p = 0, p_count - 1 do
+        soa.seed[p] = math.random()
+        soa.px[p] = (math.random() - 0.5) * 20000.0
+        soa.py[p] = (math.random() - 0.5) * 10000.0 + 5000.0
+        soa.pz[p] = (math.random() - 0.5) * 20000.0
+        soa.vx[p] = 0.0; soa.vy[p] = 0.0; soa.vz[p] = 0.0
+
+        local base_v = p * 4
+        idx_ptr[i_offset+0] = base_v;   idx_ptr[i_offset+1] = base_v+2; idx_ptr[i_offset+2] = base_v+1
+        idx_ptr[i_offset+3] = base_v;   idx_ptr[i_offset+4] = base_v+1; idx_ptr[i_offset+5] = base_v+3
+        idx_ptr[i_offset+6] = base_v+1; idx_ptr[i_offset+7] = base_v+2; idx_ptr[i_offset+8] = base_v+3
+        idx_ptr[i_offset+9] = base_v+2; idx_ptr[i_offset+10]= base_v;   idx_ptr[i_offset+11]= base_v+3
+        i_offset = i_offset + 12
     end
 
     -- 4. Boot Worker Pool (Matches your Arch CPU core count)
@@ -434,7 +445,7 @@ local function command_glfw_fiber()
 
         coroutine.yield(function() return true end)
     end
-
+    vmath_lib.vmath_destroy_workers()
     cmd_factory.Destroy(vk, device, cmd_state)
     renderer.Destroy(vk, device, sync_state, 3)
     graphics.Destroy(vk, vk_state, gfx_state)
