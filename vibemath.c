@@ -924,7 +924,8 @@ EXPORT void vmath_dispatch_swarm(
 {
     if (g_num_workers == 0) return;
 
-    int chunk_size = count / g_num_workers;
+    int base_chunk = count / g_num_workers;
+    int chunk_size = (base_chunk / 8) * 8; // Snap to 32-byte boundary
 
     vmath_mutex_lock(&g_job_mutex);
     g_jobs_completed = 0;

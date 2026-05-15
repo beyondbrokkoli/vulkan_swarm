@@ -9,7 +9,6 @@ local swapchain_core = require("swapchain")
 local descriptors = require("descriptors")
 local compute = require("compute_pipeline")
 local graphics = require("graphics_pipeline")
-local cmd_factory = require("command_factory")
 local renderer = require("renderer")
 local os = require("os")
 
@@ -130,7 +129,8 @@ local function run_weaver()
         if #active_coroutines == 0 then break end
     end
 end
-local function render_fiber(vk, vk_state, sc_state, cmd_state, sync_state, frame_state, master_buf, comp_state, gfx_state, desc_state, soa)
+
+local function render_fiber(vk, vk_state, sc_state, sync_state, frame_state, master_buf, comp_state, gfx_state, desc_state, soa)
     print("[LUA CO] Render Fiber Weaving...")
     local frame_count = 0
 
@@ -351,23 +351,28 @@ local function command_glfw_fiber()
     memory.CreateHostVisibleBuffer("MASTER_INDEX_BLOCK", "uint32_t", INDEX_SIZE / 4, idx_usage, vk_state)
 
     local master_ptr = ffi.cast("float*", memory.Mapped["MASTER_GPU_BLOCK"])
-    local p_count = 1000000
+
+    -- Dynamic Padding for 32-byte AVX2 alignment
+    local requested_count = 1000000
+    local padded_capacity = math.ceil(requested_count / 8) * 8
 
     local soa = {
-        px   = master_ptr,
-        py   = master_ptr + p_count,
-        pz   = master_ptr + (p_count * 2),
-        vx   = master_ptr + (p_count * 3),
-        vy   = master_ptr + (p_count * 4),
-        vz   = master_ptr + (p_count * 5),
-        seed = master_ptr + (p_count * 6)
+        px = master_ptr,
+        py = master_ptr + padded_capacity,
+        pz = master_ptr + (padded_capacity * 2),
+        vx = master_ptr + (padded_capacity * 3),
+        vy = master_ptr + (padded_capacity * 4),
+        vz = master_ptr + (padded_capacity * 5),
+        seed = master_ptr + (padded_capacity * 6)
     }
 
     local idx_ptr = memory.Mapped["MASTER_INDEX_BLOCK"]
     local i_offset = 0
-
     print("[LUA IO] Seeding Swarm Entropy & Geometry...")
-    for p = 0, p_count - 1 do
+
+    -- Loop uses the REAL count
+    for p = 0, requested_count - 1 do
+        -- [Keep your existing math.random assignments]
         soa.seed[p] = math.random()
         soa.px[p] = (math.random() - 0.5) * 20000.0
         soa.py[p] = (math.random() - 0.5) * 10000.0 + 5000.0
@@ -393,7 +398,6 @@ local function command_glfw_fiber()
     local desc_state = descriptors.Init(vk, device, memory.Buffers["MASTER_GPU_BLOCK"])
     local comp_state = compute.Init(vk, device, desc_state.pipelineLayout)
     local gfx_state = graphics.Init(vk, vk_state, pWidth[0], pHeight[0], desc_state.pipelineLayout, sc_state.format)
-    local cmd_state = cmd_factory.Init(vk, device, vk_state.qIndex, 3)
 
     -- RENDERER INITIALIZATION
     local sync_state = renderer.InitSync(vk, device, 3)
@@ -427,10 +431,9 @@ local function command_glfw_fiber()
 
     ffi.C.vibe_ring_init_wsi(wsi)
     ffi.C.vibe_start_render_thread()
-    -- ====================================================================
 
     start_fiber(function()
-        render_fiber(vk, vk_state, sc_state, cmd_state, sync_state, frame_state, memory.Buffers["MASTER_GPU_BLOCK"], comp_state, gfx_state, desc_state, soa)
+        render_fiber(vk, vk_state, sc_state, sync_state, frame_state, memory.Buffers["MASTER_GPU_BLOCK"], comp_state, gfx_state, desc_state, soa)
     end)
 
     local window_active = true
@@ -446,7 +449,6 @@ local function command_glfw_fiber()
         coroutine.yield(function() return true end)
     end
     vmath_lib.vmath_destroy_workers()
-    cmd_factory.Destroy(vk, device, cmd_state)
     renderer.Destroy(vk, device, sync_state, 3)
     graphics.Destroy(vk, vk_state, gfx_state)
     compute.Destroy(vk, vk_state, comp_state)
