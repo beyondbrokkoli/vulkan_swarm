@@ -247,15 +247,16 @@ local function render_fiber(vk, vk_state, sc_state, cmd_state, sync_state, frame
                 print("[LUA CO] Rebuild Complete. Resuming Weaver.")
                 is_resizing = false
 
-                -- THE FIX: Prevent massive time jump after the rebuild lag
+                -- Prevent massive time jump after the rebuild lag
                 last_time = os.clock()
             end
         else
-            -- THE FIX: Calculate real-world delta time (dt)
+            -- Calculate real-world delta time (dt)
             local current_time = os.clock()
             local dt = current_time - last_time
             last_time = current_time
-
+            -- Prevent physics explosions on lag spikes
+            dt = math.min(dt, 0.033)
             -- Input Polling & Camera Math
             local dx = ffi.C.vibe_get_mouse_dx()
             local dy = ffi.C.vibe_get_mouse_dy()
@@ -303,11 +304,11 @@ local function render_fiber(vk, vk_state, sc_state, cmd_state, sync_state, frame
             vmath.multiply_mat4(proj, view, pc.viewProj)
 
             local success = renderer.ExecuteFrame(
-                sc_state, 
-                memory.Buffers["MASTER_GPU_BLOCK"], 
-                comp_state, 
-                gfx_state, 
-                pc, 
+                sc_state,
+                memory.Buffers["MASTER_GPU_BLOCK"],
+                comp_state,
+                gfx_state,
+                pc,
                 desc_state
             )
 

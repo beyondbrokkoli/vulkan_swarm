@@ -1,9 +1,13 @@
 #version 460
 
-layout(location = 0) in vec4 fragColor;
+layout(location = 0) in vec3 fragColor;
 layout(location = 0) out vec4 outColor;
 
 void main() {
-    // Override everything. Render solid Neon Pink.
-    outColor = vec4(1.0, 0.0, 1.0, 1.0); 
+    // Soft circular particles instead of harsh squares
+    vec2 coord = gl_PointCoord - vec2(0.5);
+    if(length(coord) > 0.5) discard;
+
+    // Apply the depth gradient
+    outColor = vec4(fragColor, 0.8);
 }
